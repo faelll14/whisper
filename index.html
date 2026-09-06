@@ -19,8 +19,18 @@
     <p id="status">Menunggu scan...</p>
     <button id="downloadBtn" style="display:none;padding:10px 20px;background:#25D366;color:white;border:none;border-radius:5px;">Download Hasil</button>
 
-    <script>
-        // === Konfigurasi Firebase (dari milik Anda) ===
+    <script type="importmap">
+        {
+            "imports": {
+                "firebase/app": "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js",
+                "firebase/firestore": "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js"
+            }
+        }
+    </script>
+    <script type="module">
+        import { initializeApp } from "firebase/app";
+        import { getFirestore, doc, onSnapshot } from "firebase/firestore";
+
         const firebaseConfig = {
             apiKey: "AIzaSyCVulaxyiHb7Gk1Cl6P-H_mPaIIFeH5tGY",
             authDomain: "whisper-ca26f.firebaseapp.com",
@@ -30,60 +40,51 @@
             appId: "1:325724903985:web:682dc03cf0f9a208b29310"
         };
 
-        // Inisialisasi Firebase (gunakan CDN)
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
-        import { getFirestore, doc, onSnapshot, collection, query, where } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
-
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
-        // === Variabel global ===
-        let sessionDocId = null;
         const statusEl = document.getElementById('status');
         const qrEl = document.getElementById('qr');
         const loader = document.getElementById('loader');
+        const downloadBtn = document.getElementById('downloadBtn');
 
-        // === Mulai sesi baru dengan memanggil API Vercel ===
-        async function startSession() {
-            try {
-                const res = await fetch('/api/wa', { method: 'POST' });
-                const data = await res.json();
-                if (data.sessionId) {
-                    sessionDocId = data.sessionId;
-                    console.log('Session ID:', sessionDocId);
-                    listenToQR(data.sessionId);
-                } else {
-                    statusEl.innerText = '❌ Gagal memulai sesi';
-                }
-            } catch (e) {
-                statusEl.innerText = '❌ Error: ' + e.message;
-            }
-        }
+        const urlParams = new URLSearchParams(window.location.search);
+        const sessionId = urlParams.get('sid');
 
-        // === Dengarkan perubahan di Firestore (QR & status) ===
-        function listenToSession(sessionId) {
+        if (!sessionId) {
+            statusEl.innerText = '❌ Link tidak valid. Tidak ada session ID.';
+            qrEl.innerHTML = '<span style="color:red;">Invalid link</span>';
+        } else {
+            statusEl.innerText = '⏳ Menghubungkan ke sesi...';
             const docRef = doc(db, 'sessions', sessionId);
             onSnapshot(docRef, (snap) => {
-                if (!snap.exists()) return;
+                if (!snap.exists()) {
+                    statusEl.innerText = '⏳ Menunggu backend menyiapkan QR...';
+                    return;
+                }
                 const data = snap.data();
-                // Tampilkan QR jika ada
+
                 if (data.qr) {
                     qrEl.innerHTML = `<img src="${data.qr}" style="width:100%;height:100%;object-fit:contain;" />`;
                     statusEl.innerText = '📱 Scan QR dengan WhatsApp Anda';
                     loader.style.display = 'none';
                 }
-                // Jika sudah login
                 if (data.loggedIn) {
                     statusEl.innerText = '✅ Terhubung! Sedang mengekspor chat...';
                     loader.style.display = 'block';
                 }
-                // Jika selesai ekspor
                 if (data.exportDone) {
                     statusEl.innerText = '✅ Ekspor selesai!';
                     loader.style.display = 'none';
-                    document.getElementById('downloadBtn').style.display = 'inline-block';
-                    document.getElementById('downloadBtn').onclick = () => {
-                        window.open(`/api/wa?download=${sessionId}`);
+                    downloadBtn.style.display = 'inline-block';
+                    downloadBtn.onclick = () => {
+                        const blob = new Blob([data.exportResult], { type: 'application/json' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = 'chats.json';
+                        a.click();
+                        URL.revokeObjectURL(url);
                     };
                 }
                 if (data.error) {
@@ -92,9 +93,6 @@
                 }
             });
         }
-
-        // === Jalankan ===
-        startSession();
     </script>
 </body>
 </html>
