@@ -8,7 +8,7 @@
     "build": "echo 'No build required'"
   },
   "engines": {
-    "node": "18.x"
+    "node": "24.x"
   },
   "dependencies": {
     "whatsapp-web.js": "^1.23.0",
