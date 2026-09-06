@@ -1,8 +1,7 @@
 {
-    "functions": {
-        "api/wa.js": {
-            "runtime": "nodejs18.x",
-            "maxDuration": 60
-        }
+  "functions": {
+    "api/wa.js": {
+      "maxDuration": 60
     }
+  }
 }
